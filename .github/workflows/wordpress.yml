@@ -2,7 +2,7 @@ name: wordpress Deployment to EKS
 on: 
   push: 
     branches: 
-      - main
+      - wordpress
 
 jobs: 
   wordpress-deployment:
@@ -26,7 +26,10 @@ jobs:
         id: "install-kubectl"
 
 
+<<<<<<< HEAD
       ####
+=======
+>>>>>>> 68518b4c9a17682a9a016a5b4fb6d9beed313886
       - name: "Install Helm"
         uses: azure/setup-helm@v4.2.0
         id: "install-helm"
@@ -35,9 +38,33 @@ jobs:
         run: |
           aws eks update-kubeconfig --region us-east-1 --name my-cluster
 
+      ### deploy wordpress using bitnami helm chart    
+
       - name: "Helm to Deploy Wordpress"
         run: |
-          helm upgrade --install wordpress wordpress -f wordpress/values.yaml --set image.repository=wordpress:php7.4-apache --set replicaCount=2
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm install my-wp2 oci://registry-1.docker.io/bitnamicharts/wordpress \
+            --set service.type=LoadBalancer \
+            --set service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
+            --set wordpressUsername=admin \
+            --set wordpressPassword=defaultpass \
+            --set wordpressScheme=https
+
+      - name: Send logs to Splunk
+        env:
+          SPLUNK_URL: ${{ secrets.SPLUNK_URL }}
+          SPLUNK_TOKEN: ${{ secrets.SPLUNK_TOKEN }}
+        run: |
+          echo "Starting log shipment to Splunk"
+
+          LOG_MESSAGE="GitHub Actions workflow triggered on push to main"
+          PAYLOAD="{\"event\": \"${LOG_MESSAGE}\", \"sourcetype\": \"github_actions\", \"index\": \"main\"}"
+
+          curl -k -H "Authorization: Splunk $SPLUNK_TOKEN" \
+               -d "$PAYLOAD" \
+               $SPLUNK_URL/services/collector
+
+          echo "Logs sent to Splunk"
  
           
   
